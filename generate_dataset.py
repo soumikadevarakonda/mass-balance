@@ -3,8 +3,6 @@ import pandas as pd
 
 np.random.seed(42)
 
-SIGMA = 2.0  # analytical variability (%)
-
 def split_into_degradants(total, n=3):
     parts = np.random.dirichlet(np.ones(n)) * total
     return parts
@@ -38,19 +36,11 @@ def generate_case(case_type, n_samples):
 
         d1, d2, d3 = split_into_degradants(D, 3)
 
-        AMB = A + D
-        RMB = D / lost if lost > 0 else np.nan
-        Z_MB = (AMB - 100) / SIGMA
-
         rows.append({
             "API_remaining": round(A, 3),
             "Degradant_1": round(d1, 3),
             "Degradant_2": round(d2, 3),
             "Degradant_3": round(d3, 3),
-            "Total_degradants": round(D, 3),
-            "AMB": round(AMB, 3),
-            "RMB": round(RMB, 3),
-            "Z_MB": round(Z_MB, 3),
             "True_case": case_type
         })
 
