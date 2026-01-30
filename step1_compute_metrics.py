@@ -1,56 +1,77 @@
 import pandas as pd
 import numpy as np
 
-# Configuration
-SIGMA = 2.0  # analytical variability (%)
-INPUT_FILE = "synthetic_forced_degradation_data_500.csv"
-OUTPUT_FILE = "synthetic_forced_degradation_data_recomputed.csv"
+# =========================
+# Configuration (LOCKED)
+# =========================
+SIGMA = 5.0  # analytical variability (%)
+API_CONTROL = 100.0
+DEGRADANT_CONTROL = 0.0
 
+INPUT_FILE = "multi_drug_forced_degradation_dataset.csv"
+OUTPUT_FILE = "mass_balance_all_methods_computed.csv"
+
+# =========================
 # Load dataset
+# =========================
 df = pd.read_csv(INPUT_FILE)
 
 print("Loaded dataset shape:", df.shape)
-print(df.head())
 
-# Recompute total degradants from individual ones
-df["Total_degradants_calc"] = df["Degradant_1"] + df["Degradant_2"] + df["Degradant_3"]
 
-# Recompute AMB
-df["AMB_calc"] = df["API_remaining"] + df["Total_degradants_calc"]
+# =========================
+# Total Degradants
+# =========================
+df["Total_Degradants"] = (
+    df["Degradant_A"] +
+    df["Degradant_B"] +
+    df["Degradant_C"]
+)
 
-# Recompute RMB
-lost = 100.0 - df["API_remaining"]
-df["RMB_calc"] = df["Total_degradants_calc"] / lost
+# =========================
+# SMB & AMB
+# =========================
+df["SMB"] = df["API_Assay_Percent"] + df["Total_Degradants"]
+df["AMB"] = df["SMB"]
 
-# Recompute Z_MB
-df["Z_MB_calc"] = (df["AMB_calc"] - 100.0) / SIGMA
+# =========================
+# AMBD
+# =========================
+df["AMBD"] = df["AMB"] - 100.0
 
-# Show differences vs original (sanity check)
-print("\nSanity check (mean absolute differences):")
-if "AMB" in df.columns:
-    print("AMB diff:", np.mean(np.abs(df["AMB"] - df["AMB_calc"])))
-if "RMB" in df.columns:
-    print("RMB diff:", np.mean(np.abs(df["RMB"] - df["RMB_calc"])))
-if "Z_MB" in df.columns:
-    print("Z_MB diff:", np.mean(np.abs(df["Z_MB"] - df["Z_MB_calc"])))
+# =========================
+# RMB (control-normalized)
+# =========================
+api_loss = API_CONTROL - df["API_Assay_Percent"]
 
-# For the rest of the project, we will use ONLY the recalculated columns.
-# Let's rename them to clean names and drop old ones.
+df["RMB"] = np.where(
+    api_loss > 0,
+    (df["Total_Degradants"] - DEGRADANT_CONTROL) / api_loss,
+    np.nan
+)
 
-df["Total_degradants"] = df["Total_degradants_calc"]
-df["AMB"] = df["AMB_calc"]
-df["RMB"] = df["RMB_calc"]
-df["Z_MB"] = df["Z_MB_calc"]
+# =========================
+# RMBD
+# =========================
+df["RMBD"] = df["RMB"] - 1.0
 
-df = df.drop(columns=[
-    "Total_degradants_calc",
-    "AMB_calc",
-    "RMB_calc",
-    "Z_MB_calc"
-])
+# =========================
+# Z_MB (proposed)
+# =========================
+df["Z_MB"] = df["AMBD"] / SIGMA
 
-# Save cleaned, recomputed dataset
+# =========================
+# Basic sanity checks
+# =========================
+print("\nSanity check ranges:")
+print("AMB:", df["AMB"].min(), "to", df["AMB"].max())
+print("RMB:", df["RMB"].min(), "to", df["RMB"].max())
+print("Z_MB:", df["Z_MB"].min(), "to", df["Z_MB"].max())
+
+# =========================
+# Save output
+# =========================
 df.to_csv(OUTPUT_FILE, index=False)
 
-print("\nRecomputed dataset saved to:", OUTPUT_FILE)
+print("\nAll MB methods computed and saved to:", OUTPUT_FILE)
 print(df.head())
